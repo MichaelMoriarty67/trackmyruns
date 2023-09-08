@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from .models import Run
+from .models import Run, Runner, RunMap
 from django.utils import timezone
 
 # Create your views here.

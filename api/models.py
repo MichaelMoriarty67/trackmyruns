@@ -5,7 +5,7 @@ from django.utils import timezone
 
 
 class Runner(models.Model):
-    runner_id = models.AutoField(default=1, primary_key=True)
+    runner_id = models.AutoField(primary_key=True)
     first_name = models.CharField(max_length=35)
     last_name = models.CharField(max_length=35)
     longest_run = models.ForeignKey(
@@ -17,9 +17,9 @@ class Runner(models.Model):
 
 
 class Run(models.Model):
-    run_id = models.AutoField(default=1, primary_key=True)
+    run_id = models.AutoField(primary_key=True)
     runner_id = models.ForeignKey(
-        Runner, on_delete=models.CASCADE, default=Runner
+        Runner, on_delete=models.CASCADE
     )  # all runs are deleted when associated runner is deleted
     title = models.CharField(default="My Epic Run!", max_length=250)
     start_time = models.BigIntegerField(default=timezone.now().timestamp())
