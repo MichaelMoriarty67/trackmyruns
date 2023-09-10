@@ -4,7 +4,8 @@ from . import views
 
 app_name = "api"
 urlpatterns = [
-    path("index", views.index, name="index"),
-    path("run_by_id/<int:run_id>", views.runs_by_id, name="name_by_id"),
-    path("new/<int:run_id>", views.create_run, name="create run"),
+    path("runs/<int:run_id>", views.run_by_id, name="name_by_id"),
+    path("runs", views.runs, name="runs"),
+    path("user", views.user, name="user"),
+    path("user/<int:user_id>", views.user_by_id, name="user_by_id"),
 ]
