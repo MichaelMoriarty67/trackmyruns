@@ -65,3 +65,13 @@ class RunMap(models.Model):
     )  # if no time entered, set to 0 to represent a null stamp
     longitude = models.DecimalField(max_digits=9, decimal_places=6)
     latitude = models.DecimalField(max_digits=9, decimal_places=6)
+
+    def to_json(self):  # TODO
+        map_json = {
+            "run_id": self.run_id.run_id,
+            "timestamp": self.timestamp,
+            "longitude": self.longitude,
+            "latitude": self.latitude,
+        }
+
+        return map_json
