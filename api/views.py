@@ -26,7 +26,6 @@ def runs(request: HttpRequest):
     if request.method == "POST":
         try:
             body_json = json.loads(request.body)
-            breakpoint()
             # Remove runner_id & turn into Runner obj that has matching ID
             runner_id = body_json.pop("runner_id")
             runner = Runner.objects.get(
@@ -114,8 +113,6 @@ def run_map_by_id(request: HttpRequest, run_id: int):
 
     # POST Request
     elif request.method == "POST":
-        # TODO: Should be able to handle multiple inserts from a single request...
-        # parse json data, including
         body_json = json.loads(request.body)
 
         # Fetch Run instance using run_id
@@ -123,19 +120,23 @@ def run_map_by_id(request: HttpRequest, run_id: int):
 
         # Iterate over each RunMap in json data
         if isinstance(body_json, list):
-            for map_json in body_json:
-                map_json["run_id"] = run
-                map = RunMap(**body_json)
+            map_array = []
+
+            for map_dict in body_json:
+                map_dict["run_id"] = run
+                map = RunMap(**map_dict)
                 map.save()
 
-                # TODO: add each JSON rep of RunMap to an array
+                map_array.append(map.to_json())
+
+            return JsonResponse(map_array, safe=False, status=200)
 
         else:
             body_json["run_id"] = run
             map = RunMap(**body_json)
             map.save()
 
-        return JsonResponse(map.to_json(), safe=False, status=200)
+            return JsonResponse(map.to_json(), safe=False, status=200)
 
     else:
         return HttpResponse(
