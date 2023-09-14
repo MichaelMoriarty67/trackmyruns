@@ -75,15 +75,10 @@ def run_by_id(request: HttpRequest, run_id: int):
 
             return JsonResponse(run_json, status=200, safe=False)
 
-        # PUT Request
-        elif request.method == "PUT":
-            pass
-
         # DELETE Request
         elif request.method == "DELETE":
-            Run.objects.filter(
-                pk=run_id
-            ).delete()  # TODO: handle error when no run with specified ID
+            run = Run.objects.get(run_id=run_id)
+            run.delete()
 
             return HttpResponse(
                 f"Run with ID {run_id} succesfully deleted.", status=200
@@ -98,50 +93,70 @@ def run_by_id(request: HttpRequest, run_id: int):
         return HttpResponse(
             f"Run with ID {run_id} does not exist.\n Error Message: {e}", status=404
         )
+    except json.JSONDecodeError as e:
+        return HttpResponse(
+            f"Bad request due to improper JSON formatting.\n Error Message: {e}",
+            status=400,
+        )
 
 
 @csrf_exempt
 def run_map_by_id(request: HttpRequest, run_id: int):
-    # GET Request
-    if request.method == "GET":
-        run = Run.objects.get(run_id=run_id)
-        RunMap.objects.filter(run_id=run).values()
+    try:
+        # GET Request
+        if request.method == "GET":
+            run = Run.objects.get(run_id=run_id)
 
-        # create data structure for returning all RunMap values
-        # turn data structure into JSON serializable data
-        # return with JsonResponse and 200 OK status
+            run_coords = RunMap.objects.filter(
+                run_id=run
+            ).values()  # TODO: How can I get all values from ValueQuerySet instead of creating copy?
 
-    # POST Request
-    elif request.method == "POST":
-        body_json = json.loads(request.body)
+            run_map_json = []
+            for run_map in run_coords:
+                run_map_json.append(run_map)
 
-        # Fetch Run instance using run_id
-        run = Run.objects.get(run_id=run_id)
+            return JsonResponse(run_map_json, safe=False, status=200)
 
-        # Iterate over each RunMap in json data
-        if isinstance(body_json, list):
-            map_array = []
+        # POST Request
+        elif request.method == "POST":
+            body_json = json.loads(request.body)
 
-            for map_dict in body_json:
-                map_dict["run_id"] = run
-                map = RunMap(**map_dict)
+            # Fetch Run instance using run_id
+            run = Run.objects.get(run_id=run_id)
+
+            # Iterate over each RunMap in json data
+            if isinstance(body_json, list):
+                map_array = []
+
+                for map_dict in body_json:
+                    map_dict["run_id"] = run
+                    map = RunMap(**map_dict)
+                    map.save()
+
+                    map_array.append(map.to_json())
+
+                return JsonResponse(map_array, safe=False, status=200)
+
+            else:
+                body_json["run_id"] = run
+                map = RunMap(**body_json)
                 map.save()
 
-                map_array.append(map.to_json())
-
-            return JsonResponse(map_array, safe=False, status=200)
+                return JsonResponse(map.to_json(), safe=False, status=200)
 
         else:
-            body_json["run_id"] = run
-            map = RunMap(**body_json)
-            map.save()
-
-            return JsonResponse(map.to_json(), safe=False, status=200)
-
-    else:
+            return HttpResponse(
+                "The HTTP Method you're calling on the api/runs/:run_id/map route is not allowed.",
+                status=405,
+            )
+    except ObjectDoesNotExist as e:
         return HttpResponse(
-            "The HTTP Method you're calling on the api/runs/:run_id/map route is not allowed.",
-            status=405,
+            f"Run with ID {run_id} does not exist.\n Error Message: {e}", status=404
+        )
+    except json.JSONDecodeError as e:
+        return HttpResponse(
+            f"Bad request due to improper JSON formatting.\n Error Message: {e}",
+            status=400,
         )
 
 
@@ -165,19 +180,63 @@ def user(request: HttpRequest):
                 status=405,
             )
 
-    except (KeyError, ValueError) as e:
+    except KeyError as e:
         return HttpResponse(
             f"Improper keyword arguments for api/user/ POST method.\nError Message: {e}",
+            status=400,
+        )
+    except json.JSONDecodeError as e:
+        return HttpResponse(
+            f"Bad request due to improper JSON formatting.\n Error Message: {e}",
             status=400,
         )
 
 
 @csrf_exempt
 def user_by_id(request: HttpRequest, user_id: int):
-    # GET Request
-    # PUT Request
+    try:
+        # GET Request
+        if request.method == "GET":
+            user = Runner.objects.get(runner_id=user_id)
 
-    pass
+            return JsonResponse(user.to_json(), safe=False, status=200)
+
+        # PATCH Request
+        elif request.method == "PATCH":
+            body_json = json.loads(request.body)
+
+            user = Runner.objects.get(runner_id=user_id)
+
+            for key in body_json.keys():
+                if hasattr(user, f"{key}"):
+                    setattr(user, f"{key}", body_json[f"{key}"])
+
+                else:
+                    return HttpResponse(
+                        f"Error: Requesting to update attributes that do not exist on user with ID {user_id}.",
+                        status=404,
+                    )
+
+            user.save()
+
+            return JsonResponse(user.to_json(), safe=False, status=200)
+
+        else:
+            return HttpResponse(
+                "The HTTP Method you're calling on the api/user/:user_id route is not allowed.",
+                status=405,
+            )
+    except (
+        ObjectDoesNotExist
+    ) as e:  # TODO: watch out if exposing a user_id or this info publically is ok? Maybe should return an unauthorized error instead.
+        return HttpResponse(
+            f"User with ID {user_id} does not exist.\n Error Message: {e}", status=404
+        )
+    except json.JSONDecodeError as e:
+        return HttpResponse(
+            f"Bad request due to improper JSON formatting.\n Error Message: {e}",
+            status=400,
+        )
 
 
 @csrf_exempt
@@ -185,5 +244,19 @@ def runs_by_user_id(
     request: HttpRequest, user_id: int
 ):  # TODO: can this be consolidated into user_by_id by catching /runs route?
     # GET Request
+    try:
+        user = Runner.objects.get(runner_id=user_id)
+        user_runs = Run.objects.filter(runner_id=user).values()
 
-    pass
+        user_runs_json = []
+        for run in user_runs:
+            user_runs_json.append(run)
+
+        return JsonResponse(user_runs_json, safe=False, status=200)
+
+    except (
+        ObjectDoesNotExist
+    ) as e:  # TODO: watch out if exposing a user_id or this info publically is ok? Maybe should return an unauthorized error instead.
+        return HttpResponse(
+            f"User with ID {user_id} does not exist.\n Error Message: {e}", status=404
+        )
