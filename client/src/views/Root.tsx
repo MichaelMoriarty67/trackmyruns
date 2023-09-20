@@ -1,8 +1,7 @@
-import React from 'react';
-import { Outlet } from 'react-router-dom';
+import React from 'react'
+import { Outlet } from 'react-router-dom'
 
 function Root() {
-
     return (
         <>
             <Outlet />
@@ -10,4 +9,4 @@ function Root() {
     )
 }
 
-export default Root;
+export default Root
