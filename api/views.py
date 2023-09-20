@@ -51,8 +51,7 @@ def runs(request: HttpRequest):
         queryset_runs = Run.objects.order_by("run_id")
         json_runs = serialize("json", queryset_runs)
 
-        # TODO: queryset --> only a dict of runs (maybe create a helper func?)
-
+        # TODO: queryset --> only a dict of runs. DOESNT WORK ON CLIENTS RN.
         return JsonResponse(json_runs, safe=False, status=200)
 
     else:
