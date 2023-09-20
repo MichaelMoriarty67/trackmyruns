@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
+import { createBrowserRouter, createRoutesFromElements, Route } from 'react-router-dom';
 import logo from './logo.svg';
 import './App.css';
+import { Root, Auth } from './views';
 
 function App() {
 
@@ -18,6 +20,13 @@ function App() {
       })
   }, []);
 
+  const router = createBrowserRouter(
+    createRoutesFromElements(
+      <Route path='/' element={<Root />}>
+        <Route index element={<Auth />}/>
+      </Route>
+    )
+  )
 
   return (
     <div className="App">
