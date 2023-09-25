@@ -10,6 +10,7 @@ import {
     IdTokenResult,
 } from 'firebase/auth'
 import { setSafeCookie, getCookie } from '../utils'
+import axios from 'axios'
 
 // TODO: make firebase config and methods into a custom hook (?)
 const firebaseConfig = {
@@ -38,6 +39,20 @@ interface AuthenticationProps {
     setToken(token: string): void
 }
 
+const test_auth = () => {
+    axios
+        .get('http://127.0.0.1:8000/api/auth', {
+            method: 'GET',
+            withCredentials: true,
+        })
+        .then((response) => {
+            console.log(response)
+        })
+        .catch((error) => {
+            console.error(error)
+        })
+}
+
 function Authentication({ setToken }: AuthenticationProps) {
     const [user, setUser] = useState<User | null>(null)
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -51,7 +66,7 @@ function Authentication({ setToken }: AuthenticationProps) {
             .then((user) => {
                 setUser(user.user)
                 user.user.getIdTokenResult().then((tokenId: IdTokenResult) => {
-                    setSafeCookie(tokenId.token, 'firebaseToken', 1)
+                    setSafeCookie(tokenId.token, 'firebase_token', 1)
                     setToken(tokenId.token)
                 })
             })
@@ -72,7 +87,7 @@ function Authentication({ setToken }: AuthenticationProps) {
             .then((user) => {
                 setUser(user.user)
                 user.user.getIdTokenResult().then((tokenId: IdTokenResult) => {
-                    setSafeCookie(tokenId.token, 'firebaseToken', 1)
+                    setSafeCookie(tokenId.token, 'firebase_token', 1)
                     setToken(tokenId.token)
                 })
             })
@@ -101,10 +116,11 @@ function Authentication({ setToken }: AuthenticationProps) {
                 {' '}
                 Sign In{' '}
             </button>
-            <button onClick={() => getCookie('firebaseToken')}>
+            <button onClick={() => getCookie('firebase_token')}>
                 {' '}
                 Get Cookie{' '}
             </button>
+            <button onClick={test_auth}> Call Auth </button>
 
             {errorMessage && <p>Error: {errorMessage}</p>}
         </div>

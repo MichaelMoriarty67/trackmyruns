@@ -6,7 +6,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.core.serializers import serialize
 from django.core.exceptions import ObjectDoesNotExist
 import json
-
+import firebase_admin
+from firebase_admin import credentials, auth
+import os
 
 # TODO: seems like all routes have some predefined structure for what verbs they accept,
 # what params they need to see in the body. Can I make a functional abstraction from this?
@@ -15,6 +17,46 @@ import json
 # TODO: Errors to handle:
 # JSONDEcodeError <-- when data not specified as application/json AND when request body has whitespace and \n
 # ie) b'{\n    "run_id": 1,\n    "timestamp": 1694541732082,\n    "longitude": 55.6797,\n    "latitude": -49.7914,\n}'
+
+cred = credentials.Certificate(os.getcwd() + "/FirebaseServerKey.json")
+default_app = firebase_admin.initialize_app(cred)
+
+
+# TODO: Delete this route and turn it into a reusable function to be used in other routes
+@csrf_exempt
+def testing_auth(request: HttpRequest):
+    try:
+        # extract firebaseToken cookie from request
+        cookies = request.COOKIES
+        print(f"cookies from client: {cookies}")
+        firebase_token = cookies["firebase_token"]
+
+        # pass token to auth.verify_id_token(id_token)
+        decoded_token = auth.verify_id_token(firebase_token)
+        uid = decoded_token["uid"]
+
+        print(f"UID found: {uid}")
+        return JsonResponse(uid, safe=False, status=200)
+
+    except KeyError:
+        return JsonResponse({"message": "400 Bad Request"}, status=400)
+
+
+@csrf_exempt
+def register(request: HttpRequest):
+    """POST: Calls firebase to create new user,
+    creates new Runner with payload data and UID from firebase."""
+
+    if request.method == "POST":
+        pass
+
+    else:
+        return JsonResponse(
+            {
+                "message": "The HTTP Method you're calling on the api/register/ route is not allowed."
+            },
+            status=405,
+        )
 
 
 @csrf_exempt

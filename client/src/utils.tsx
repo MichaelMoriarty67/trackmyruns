@@ -5,7 +5,7 @@ export const setSafeCookie = (
 ) => {
     let date = new Date()
     date.setHours(date.getHours() + hoursToExpiry)
-    document.cookie = `${cookieName}=${cookie}; expires=${date.toUTCString()}; path=/; secure;` // add "samesite=strict; HttpOnly"
+    document.cookie = `${cookieName}=${cookie}; expires=${date.toUTCString()}; path=/;` // TODO: add "samesite=strict; secure; HttpOnly"
 }
 
 export const getCookie = (cookieName: string) => {
@@ -14,5 +14,5 @@ export const getCookie = (cookieName: string) => {
         .find((row) => row.startsWith(`${cookieName}=`))
         ?.split('=')[1]
 
-    return cookie
+    console.log(cookie)
 }

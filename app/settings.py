@@ -136,3 +136,5 @@ CORS_ALLOWED_ORIGINS = [
     env("DEVELOPMENT_REACT_ORIGIN"),
     # TODO: add an origin for production version of frontend
 ]
+
+CORS_ALLOW_CREDENTIALS = True
