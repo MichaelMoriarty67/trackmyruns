@@ -9,6 +9,7 @@ import json
 import firebase_admin
 from firebase_admin import credentials, auth
 import os
+from app.settings import env
 
 # TODO: seems like all routes have some predefined structure for what verbs they accept,
 # what params they need to see in the body. Can I make a functional abstraction from this?
@@ -17,9 +18,59 @@ import os
 # TODO: Errors to handle:
 # JSONDEcodeError <-- when data not specified as application/json AND when request body has whitespace and \n
 # ie) b'{\n    "run_id": 1,\n    "timestamp": 1694541732082,\n    "longitude": 55.6797,\n    "latitude": -49.7914,\n}'
-
-cred = credentials.Certificate(os.getcwd() + "/FirebaseServerKey.json")
+cred_file_path = os.getcwd() + "/FirebaseServerKey.json"
+cred = credentials.Certificate(cred_file_path)
 default_app = firebase_admin.initialize_app(cred)
+
+
+def authenticate_user_by_token(token: str) -> str:
+    """Takes in a token and authenticates it with Firebase Auth."""
+    decoded_token = auth.verify_id_token(id_token=token, check_revoked=True)
+    uid = decoded_token["uid"]
+
+    return uid
+
+
+def rest_boilerplate(request: HttpRequest, route_logic: callable):
+    try:
+        # Authenticate a user
+        cookies = request.COOKIES
+        firebase_token = cookies[env("FIREBASE_COOKIE_NAME")]
+        uid = authenticate_user_by_token(token=firebase_token)
+
+        # Fetch Runner profile using uid
+        user = Runner.objects.filter(
+            runner_firebase_uid=uid  # TODO: handle ObjectDoesntExist error
+        )
+
+        req_body = json.loads(request.body)
+        req_method = request.method
+
+        response = route_logic(user, req_body, req_method)
+        return response
+
+    except AssertionError:
+        return JsonResponse(
+            {"message": "Requested Actions Forbidden For Given Credentials."},
+            status=403,
+        )
+
+    # TODO: send back a 401 Unauthorized if token is expired, revoked, malformed, or invalid (from error raised by authenticate_user_by_token)
+
+
+@csrf_exempt
+def test_route(request: HttpRequest):
+    """Test route for fetching a users runs."""
+
+    def test_route_logic(user: Runner, req_body: dict, req_method: str):
+        # Authorization logic goes here...
+        assert user.runner_id == req_body["runner_id"]
+
+        # Route business logic goes here...
+        # TODO: write test route biz logic (copy paste run_by_id body and alter to this funcs params)
+
+    response = rest_boilerplate(request=request, route_logic=test_route_logic)
+    return response
 
 
 # TODO: Delete this route and turn it into a reusable function to be used in other routes
@@ -28,7 +79,6 @@ def testing_auth(request: HttpRequest):
     try:
         # extract firebaseToken cookie from request
         cookies = request.COOKIES
-        print(f"cookies from client: {cookies}")
         firebase_token = cookies["firebase_token"]
 
         # pass token to auth.verify_id_token(id_token)

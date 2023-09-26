@@ -14,6 +14,7 @@ class Runner(models.Model):
     # TODO: I should create a custom on_delete function that sets longest_run field to the runners next longest run if longest is deleted
     total_kms = models.FloatField(default=0)
     total_time = models.IntegerField(default=0)
+    runner_firebase_uid = models.CharField(max_length=128, default="N/A")
 
     def to_json(self) -> dict:
         runner_json = {
