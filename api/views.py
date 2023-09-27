@@ -23,6 +23,41 @@ cred = credentials.Certificate(cred_file_path)
 default_app = firebase_admin.initialize_app(cred)
 
 
+class RequestWrapper:
+    def __init__(self, request: HttpRequest, route_logic: callable, **kwargs):
+        self.request = request
+        self.route_logic = route_logic
+        self.req_method = request.method
+
+        if request.body:
+            self.req_body = json.loads(request.body)
+
+        else:
+            self.req_body = {}
+
+        self.kwargs = kwargs
+
+    def auth(self):
+        cookies = self.request.COOKIES
+        firebase_token = cookies[env("FIREBASE_COOKIE_NAME")]
+
+        uid = authenticate_user_by_token(token=firebase_token)
+
+        # Fetch Runner profile using uid
+        user = Runner.objects.get(
+            runner_firebase_uid=uid  # TODO: handle ObjectDoesntExist error
+        )
+
+        return user
+
+    def run(self, user: Runner):
+        response = self.route_logic(
+            req_body=self.req_body, req_method=self.req_method, user=user, **self.kwargs
+        )
+
+        return response
+
+
 def authenticate_user_by_token(token: str) -> str:
     """Takes in a token and authenticates it with Firebase Auth."""
     decoded_token = auth.verify_id_token(id_token=token, check_revoked=True)
@@ -31,45 +66,47 @@ def authenticate_user_by_token(token: str) -> str:
     return uid
 
 
-def rest_boilerplate(request: HttpRequest, route_logic: callable):
-    try:
-        # Authenticate a user
-        cookies = request.COOKIES
-        firebase_token = cookies[env("FIREBASE_COOKIE_NAME")]
-        uid = authenticate_user_by_token(token=firebase_token)
-
-        # Fetch Runner profile using uid
-        user = Runner.objects.filter(
-            runner_firebase_uid=uid  # TODO: handle ObjectDoesntExist error
-        )
-
-        req_body = json.loads(request.body)
-        req_method = request.method
-
-        response = route_logic(user, req_body, req_method)
-        return response
-
-    except AssertionError:
-        return JsonResponse(
-            {"message": "Requested Actions Forbidden For Given Credentials."},
-            status=403,
-        )
-
-    # TODO: send back a 401 Unauthorized if token is expired, revoked, malformed, or invalid (from error raised by authenticate_user_by_token)
-
-
 @csrf_exempt
-def test_route(request: HttpRequest):
+def test_route(request: HttpRequest, run_id: int):
     """Test route for fetching a users runs."""
 
-    def test_route_logic(user: Runner, req_body: dict, req_method: str):
-        # Authorization logic goes here...
-        assert user.runner_id == req_body["runner_id"]
+    def test_route_logic(
+        user: Runner, req_body: dict[str, str], req_method: str, **kwargs
+    ):
+        req_run = Run.objects.get(run_id=kwargs["run_id"])
+        req_run_runner_id = req_run.runner_id.runner_id
 
-        # Route business logic goes here...
-        # TODO: write test route biz logic (copy paste run_by_id body and alter to this funcs params)
+        assert user.runner_id == req_run_runner_id
 
-    response = rest_boilerplate(request=request, route_logic=test_route_logic)
+        # GET Request
+        if req_method == "GET":
+            run = Run.objects.get(run_id=kwargs["run_id"])
+            run_json = run.to_json()
+
+            return JsonResponse(run_json, status=200, safe=False)
+
+        # DELETE Request
+        elif req_method == "DELETE":
+            run = Run.objects.get(run_id=kwargs["run_id"])
+            run.delete()
+
+            return JsonResponse(
+                {"message": f"Run with ID {kwargs['run_id']} succesfully deleted."},
+                status=200,
+            )
+
+        else:
+            return JsonResponse(
+                {
+                    "message": "The HTTP Method you're calling on the api/runs/:run_id route is not allowed."
+                },
+                status=405,
+            )
+
+    req_wrapper = RequestWrapper(request, test_route_logic, run_id=run_id)
+    authed_user = req_wrapper.auth()
+    response = req_wrapper.run(authed_user)
+
     return response
 
 
