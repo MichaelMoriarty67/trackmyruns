@@ -10,5 +10,4 @@ urlpatterns = [
     path("user", views.user, name="user"),
     path("user/<int:user_id>", views.user_by_id, name="user_by_id"),
     path("user/<int:user_id>/runs", views.runs_by_user_id, name="runs_by_user_id"),
-    path("test/<int:run_id>", views.test_route, name="test"),
 ]

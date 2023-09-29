@@ -23,6 +23,28 @@ cred = credentials.Certificate(cred_file_path)
 default_app = firebase_admin.initialize_app(cred)
 
 
+class RESTError(Exception):
+    ERROR_MAP = {
+        "KeyError": 400,
+        "ValueError": 400,
+        "InvalidIdTokenError": 400,
+        "ExpiredIdTokenError": 401,
+        "RevokedIdTokenError": 401,
+        "CertificateFetchError": 500,
+        "UserDisabledError": 401,
+        "JSONDecodeError": 400,
+    }
+
+    def __init__(self, message: str, **kwargs):
+        self.message = message
+
+        if kwargs.get("status_code"):
+            self.status_code = kwargs["status_code"]
+
+        if kwargs.get("status_code_via_error"):
+            self.status_code = self.ERROR_MAP[kwargs["status_code_via_error"]]
+
+
 class RequestWrapper:
     def __init__(self, request: HttpRequest, route_logic: callable, **kwargs):
         self.request = request
@@ -30,7 +52,13 @@ class RequestWrapper:
         self.req_method = request.method
 
         if request.body:
-            self.req_body = json.loads(request.body)
+            try:
+                self.req_body = json.loads(request.body)  # JSONDecodeError
+            except json.JSONDecodeError as e:
+                raise RESTError(
+                    f"Error decoding HTTP body to JSON.\n{e}",
+                    status_code_via_error=type(e).__name__,
+                )
 
         else:
             self.req_body = {}
@@ -39,16 +67,25 @@ class RequestWrapper:
 
     def auth(self):
         cookies = self.request.COOKIES
-        firebase_token = cookies[env("FIREBASE_COOKIE_NAME")]
+        firebase_token = cookies.get(env("FIREBASE_COOKIE_NAME"))
 
-        uid = authenticate_user_by_token(token=firebase_token)
+        if firebase_token:
+            try:
+                uid = self._authenticate_user_by_token(token=firebase_token)
+                user = Runner.objects.get(runner_firebase_uid=uid)
 
-        # Fetch Runner profile using uid
-        user = Runner.objects.get(
-            runner_firebase_uid=uid  # TODO: handle ObjectDoesntExist error
-        )
+                return user
+            except ValueError as e:
+                raise RESTError(
+                    f"Error during Auth process:\n{e}",
+                    status_code_via_error=type(e).__name__,
+                )
 
-        return user
+        else:
+            raise RESTError(
+                f"Error during Auth process:\nImproperly formatted authentication cookie. Use '{env('FIREBASE_COOKIE_NAME')}' instead.",
+                status_code=400,
+            )
 
     def run(self, user: Runner):
         response = self.route_logic(
@@ -57,93 +94,12 @@ class RequestWrapper:
 
         return response
 
-
-def authenticate_user_by_token(token: str) -> str:
-    """Takes in a token and authenticates it with Firebase Auth."""
-    decoded_token = auth.verify_id_token(id_token=token, check_revoked=True)
-    uid = decoded_token["uid"]
-
-    return uid
-
-
-@csrf_exempt
-def test_route(request: HttpRequest, run_id: int):
-    """Test route for fetching a users runs."""
-
-    def test_route_logic(
-        user: Runner, req_body: dict[str, str], req_method: str, **kwargs
-    ):
-        req_run = Run.objects.get(run_id=kwargs["run_id"])
-        req_run_runner_id = req_run.runner_id.runner_id
-
-        assert user.runner_id == req_run_runner_id
-
-        # GET Request
-        if req_method == "GET":
-            run = Run.objects.get(run_id=kwargs["run_id"])
-            run_json = run.to_json()
-
-            return JsonResponse(run_json, status=200, safe=False)
-
-        # DELETE Request
-        elif req_method == "DELETE":
-            run = Run.objects.get(run_id=kwargs["run_id"])
-            run.delete()
-
-            return JsonResponse(
-                {"message": f"Run with ID {kwargs['run_id']} succesfully deleted."},
-                status=200,
-            )
-
-        else:
-            return JsonResponse(
-                {
-                    "message": "The HTTP Method you're calling on the api/runs/:run_id route is not allowed."
-                },
-                status=405,
-            )
-
-    req_wrapper = RequestWrapper(request, test_route_logic, run_id=run_id)
-    authed_user = req_wrapper.auth()
-    response = req_wrapper.run(authed_user)
-
-    return response
-
-
-# TODO: Delete this route and turn it into a reusable function to be used in other routes
-@csrf_exempt
-def testing_auth(request: HttpRequest):
-    try:
-        # extract firebaseToken cookie from request
-        cookies = request.COOKIES
-        firebase_token = cookies["firebase_token"]
-
-        # pass token to auth.verify_id_token(id_token)
-        decoded_token = auth.verify_id_token(firebase_token)
+    def _authenticate_user_by_token(token: str) -> str:
+        """Takes in a token and authenticates it with Firebase Auth."""
+        decoded_token = auth.verify_id_token(id_token=token, check_revoked=True)
         uid = decoded_token["uid"]
 
-        print(f"UID found: {uid}")
-        return JsonResponse(uid, safe=False, status=200)
-
-    except KeyError:
-        return JsonResponse({"message": "400 Bad Request"}, status=400)
-
-
-@csrf_exempt
-def register(request: HttpRequest):
-    """POST: Calls firebase to create new user,
-    creates new Runner with payload data and UID from firebase."""
-
-    if request.method == "POST":
-        pass
-
-    else:
-        return JsonResponse(
-            {
-                "message": "The HTTP Method you're calling on the api/register/ route is not allowed."
-            },
-            status=405,
-        )
+        return uid
 
 
 @csrf_exempt
@@ -192,40 +148,50 @@ def runs(request: HttpRequest):
 
 @csrf_exempt
 def run_by_id(request: HttpRequest, run_id: int):
-    try:
-        # GET Request
-        if request.method == "GET":
-            # Call get on Runner.objects
-            run = Run.objects.get(run_id=run_id)
+    """GET: Get a specific run.
+    DELETE: Delete a specific run"""
 
-            # turn run into a JSON serializable obj (dict)
+    def runs_by_id_logic(
+        user: Runner, req_body: dict[str, str], req_method: str, **kwargs
+    ):
+        req_run = Run.objects.get(run_id=kwargs["run_id"])
+        req_run_runner_id = req_run.runner_id.runner_id
+
+        assert user.runner_id == req_run_runner_id
+
+        # GET Request
+        if req_method == "GET":
+            run = Run.objects.get(run_id=kwargs["run_id"])
             run_json = run.to_json()
 
             return JsonResponse(run_json, status=200, safe=False)
 
         # DELETE Request
-        elif request.method == "DELETE":
-            run = Run.objects.get(run_id=run_id)
+        elif req_method == "DELETE":
+            run = Run.objects.get(run_id=kwargs["run_id"])
             run.delete()
 
-            return HttpResponse(
-                f"Run with ID {run_id} succesfully deleted.", status=200
+            return JsonResponse(
+                {"message": f"Run with ID {kwargs['run_id']} succesfully deleted."},
+                status=200,
             )
 
         else:
-            return HttpResponse(
-                "The HTTP Method you're calling on the api/runs/:run_id route is not allowed.",
+            return JsonResponse(
+                {
+                    "message": "The HTTP Method you're calling on the api/runs/:run_id route is not allowed."
+                },
                 status=405,
             )
-    except ObjectDoesNotExist as e:
-        return HttpResponse(
-            f"Run with ID {run_id} does not exist.\n Error Message: {e}", status=404
-        )
-    except json.JSONDecodeError as e:
-        return HttpResponse(
-            f"Bad request due to improper JSON formatting.\n Error Message: {e}",
-            status=400,
-        )
+
+    try:
+        req_wrapper = RequestWrapper(request, runs_by_id_logic, run_id=run_id)
+        authed_user = req_wrapper.auth()
+        response = req_wrapper.run(authed_user)
+
+        return response
+    except RESTError as e:
+        return JsonResponse({"message": e.message, "status_code": e.status_code})
 
 
 @csrf_exempt
@@ -387,4 +353,21 @@ def runs_by_user_id(
     ) as e:  # TODO: watch out if exposing a user_id or this info publically is ok? Maybe should return an unauthorized error instead.
         return HttpResponse(
             f"User with ID {user_id} does not exist.\n Error Message: {e}", status=404
+        )
+
+
+@csrf_exempt
+def register(request: HttpRequest):
+    """POST: Calls firebase to create new user,
+    creates new Runner with payload data and UID from firebase."""
+
+    if request.method == "POST":
+        pass
+
+    else:
+        return JsonResponse(
+            {
+                "message": "The HTTP Method you're calling on the api/register/ route is not allowed."
+            },
+            status=405,
         )
