@@ -67,8 +67,9 @@ class RunMap(models.Model):
     longitude = models.DecimalField(max_digits=9, decimal_places=6)
     latitude = models.DecimalField(max_digits=9, decimal_places=6)
 
-    def to_json(self):  # TODO
+    def to_json(self):
         map_json = {
+            "run_map_id": self.id,
             "run_id": self.run_id.run_id,
             "timestamp": self.timestamp,
             "longitude": self.longitude,
