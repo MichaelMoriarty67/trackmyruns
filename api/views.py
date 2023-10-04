@@ -72,7 +72,7 @@ class RequestWrapper:
 
         if request.body:
             try:
-                self.req_body = json.loads(request.body)  # JSONDecodeError
+                self.req_body = json.loads(request.body)
             except json.JSONDecodeError as e:
                 raise RESTError(type(e).__name__)
 
@@ -264,10 +264,12 @@ def run_map_by_id(
                     run_map = RunMap(**map_dict)
                     run_map_objs.append(run_map)
 
-                # save each RunMap with bulk_create for graceful error handling
-                RunMap.objects.bulk_create(run_map_objs)
+                RunMap.objects.bulk_create(run_map_objs)  # bulk save
+                requested_run.add_multiple_run_maps(
+                    run_map_objs
+                )  # add run maps to Run's totals
 
-                # convert each to JSON representation and return
+                # convert to JSON
                 for i in range(len(run_map_objs)):
                     run_map_objs[i] = run_map_objs[i].to_json()
 
@@ -277,6 +279,7 @@ def run_map_by_id(
                 req_body["run_id"] = requested_run
                 map = RunMap(**req_body)
                 map.save()
+                requested_run.add_run_map(map)
 
                 return JsonResponse(map.to_json(), safe=False, status=200)
 

@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from .utils import change_in_time_and_kms
 
 # Create your models here.
 
@@ -15,6 +16,13 @@ class Runner(models.Model):
     total_kms = models.FloatField(default=0)
     total_time = models.IntegerField(default=0)
     runner_firebase_uid = models.CharField(max_length=128, default="N/A")
+
+    def save(self, *args, **kwargs):
+        # Adjustments before saving
+        self.total_kms = round(self.total_kms, 4)
+
+        # Call save() on base class
+        super(Run, self).save(*args, **kwargs)
 
     def to_json(self) -> dict:
         runner_json = {
@@ -40,6 +48,74 @@ class Run(models.Model):
     total_kms = models.FloatField(default=0, verbose_name="distance in kms")
     total_time = models.IntegerField(default=0, verbose_name="time in seconds")
 
+    def add_run_map(self, new_map):
+        """Evaluate and add the change in distance (kms) and time (s) to a Run's total_kms
+        and total_time from a single RunMap."""
+        diff_kms = 0
+        diff_time = 0
+
+        curr_timestamp = new_map.timestamp
+        prev_map = (
+            RunMap.objects.filter(run_id=self.run_id)
+            .filter(timestamp__lte=curr_timestamp)
+            .exclude(id=new_map.id)
+            .order_by("-timestamp")
+            .first()
+        )
+        breakpoint()
+
+        if prev_map:
+            diff_kms, diff_time = change_in_time_and_kms(new_map, prev_map)
+
+        self.total_time += diff_time
+        self.total_kms += diff_kms
+
+        self.runner_id.total_time += diff_time  # Update Runner totals
+        self.runner_id.total_kms += diff_kms
+
+        self.save()
+
+    def add_multiple_run_maps(self, new_run_maps: list):
+        """Evaluate and add the change in distance (kms) and time (s) to a Run's total_kms
+        and total_time across multiple RunMaps."""
+        diff_time: int = 0
+        diff_kms: float = 0.00
+
+        total_time: int = 0
+        total_kms: float = 0.00
+
+        for new_map in new_run_maps:
+            curr_timestamp = new_map.timestamp
+
+            prev_map = (
+                RunMap.objects.filter(run_id=self.run_id)
+                .filter(timestamp__lte=curr_timestamp)
+                .exclude(id=new_map.id)
+                .order_by("-timestamp")
+                .first()
+            )
+
+            if prev_map:
+                diff_kms, diff_time = change_in_time_and_kms(new_map, prev_map)
+
+            total_kms += diff_kms
+            total_time += diff_time
+
+        self.total_time += total_time
+        self.total_kms += total_kms
+
+        self.runner_id.total_time += total_time  # Update Runner totals
+        self.runner_id.total_kms += total_kms
+
+        self.save()
+
+    def save(self, *args, **kwargs):
+        # Adjustments before saving
+        self.total_kms = round(self.total_kms, 4)
+
+        # Call save() on base class
+        super(Run, self).save(*args, **kwargs)
+
     def to_json(self) -> dict:  # TODO
         run_json = {
             "run_id": self.run_id,
@@ -54,7 +130,7 @@ class Run(models.Model):
         return run_json
 
     def __str__(self):
-        return f"{self.date_pub.year}/{self.date_pub.month}/{self.date_pub.day} | {self.duration_kms}km | {self.duration_sec / 60} min"
+        return f"ID: {self.run_id} | {self.date_pub.year}/{self.date_pub.month}/{self.date_pub.day} | {self.total_kms}km | {self.total_time / 60} min"
 
 
 class RunMap(models.Model):
