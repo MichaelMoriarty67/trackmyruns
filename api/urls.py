@@ -9,5 +9,4 @@ urlpatterns = [
     path("runs/<int:run_id>/map", views.run_map_by_id, name="run_map_by_id"),
     path("register", views.register, name="register"),
     path("user", views.user, name="user"),
-    path("user/<int:user_id>/runs", views.runs_by_user_id, name="runs_by_user_id"),
 ]

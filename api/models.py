@@ -19,10 +19,12 @@ class Runner(models.Model):
 
     def save(self, *args, **kwargs):
         # Adjustments before saving
-        self.total_kms = round(self.total_kms, 4)
+        self.total_kms = round(
+            self.total_kms, 4
+        )  # TODO: Review if accurate to 0.1 meters (4 decimals) is okay for frotnend map creations
 
         # Call save() on base class
-        super(Run, self).save(*args, **kwargs)
+        super(Runner, self).save(*args, **kwargs)
 
     def to_json(self) -> dict:
         runner_json = {
@@ -62,7 +64,6 @@ class Run(models.Model):
             .order_by("-timestamp")
             .first()
         )
-        breakpoint()
 
         if prev_map:
             diff_kms, diff_time = change_in_time_and_kms(new_map, prev_map)
@@ -74,6 +75,7 @@ class Run(models.Model):
         self.runner_id.total_kms += diff_kms
 
         self.save()
+        self.runner_id.save()
 
     def add_multiple_run_maps(self, new_run_maps: list):
         """Evaluate and add the change in distance (kms) and time (s) to a Run's total_kms
@@ -108,13 +110,16 @@ class Run(models.Model):
         self.runner_id.total_kms += total_kms
 
         self.save()
+        self.runner_id.save()
 
     def save(self, *args, **kwargs):
         # Adjustments before saving
         self.total_kms = round(self.total_kms, 4)
 
         # Call save() on base class
-        super(Run, self).save(*args, **kwargs)
+        super(Run, self).save(
+            *args, **kwargs
+        )  # TODO: Review if accurate to 0.1 meters (4 decimals) is okay for frotnend map creations
 
     def to_json(self) -> dict:  # TODO
         run_json = {

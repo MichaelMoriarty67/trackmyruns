@@ -352,13 +352,15 @@ def user(request: HttpRequest):
     def user_logic(
         authed_user: Runner, req_body: dict[str, str], req_method: str, **kwargs
     ):
-        assert (
-            authed_user.runner_firebase_uid == req_body["runner_firebase_uid"]
-        )  # TODO: rethink this name in interface?
+        if req_body.get("runner_firebase_uid"):
+            assert authed_user.runner_firebase_uid == req_body["runner_firebase_uid"]
 
-        requested_user = Runner.objects.get(
-            runner_firebase_uid=req_body["runner_firebase_uid"]
-        )
+            requested_user = Runner.objects.get(
+                runner_firebase_uid=req_body["runner_firebase_uid"]
+            )
+
+        else:
+            requested_user = authed_user
 
         # GET Request
         if request.method == "GET":
@@ -395,26 +397,3 @@ def user(request: HttpRequest):
         return response
     except RESTError as e:
         return JsonResponse({"message": e.message}, status=e.status_code)
-
-
-@csrf_exempt
-def runs_by_user_id(
-    request: HttpRequest, user_id: int
-):  # TODO: can this be consolidated into user_by_id by catching /runs route?
-    # GET Request
-    try:
-        user = Runner.objects.get(runner_id=user_id)
-        user_runs = Run.objects.filter(runner_id=user).values()
-
-        user_runs_json = []
-        for run in user_runs:
-            user_runs_json.append(run)
-
-        return JsonResponse(user_runs_json, safe=False, status=200)
-
-    except (
-        ObjectDoesNotExist
-    ) as e:  # TODO: watch out if exposing a user_id or this info publically is ok? Maybe should return an unauthorized error instead.
-        return HttpResponse(
-            f"User with ID {user_id} does not exist.\n Error Message: {e}", status=404
-        )
