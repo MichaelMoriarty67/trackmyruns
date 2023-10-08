@@ -41,7 +41,7 @@ Database: PostgreSQL
 ## SETUP
  1. Make sure you have both Python and Node installed
  2. (Optionally) Start a python virtual environment in the top level dir
- 3. Install the server dependencies by running `python -r requirements.txt`
+ 3. Install the server dependencies by running `pip install -r requirements.txt`
  4. Install the client dependencies by running `cd client && npm install`
  5. Migrate back to the top level dir and start the backend dev server with `python manage.py runserver`
  6. In a seperate shell process, migrate to the `client` dir and start the client dev server with `npm start`
