@@ -83,6 +83,7 @@ class RequestWrapper:
 
     def auth(self):
         cookies = self.request.COOKIES
+        print(f"Request cookies: {cookies}")
         firebase_token = cookies.get(env("FIREBASE_COOKIE_NAME"))
 
         if firebase_token:
@@ -95,7 +96,7 @@ class RequestWrapper:
                 raise RESTError(type(e).__name__)
 
         else:
-            raise RESTError("JSONDecodeError")
+            raise RESTError("InvalidIdTokenError")
 
     def run(self, user: Runner):
         try:

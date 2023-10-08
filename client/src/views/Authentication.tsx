@@ -41,7 +41,8 @@ interface AuthenticationProps {
 
 const test_auth = () => {
     axios
-        .get('http://127.0.0.1:8000/api/auth', {
+        .get('http://localhost:8000/api/runs', {
+            // must call localhost; 127.0.0.1 won't send cookies
             method: 'GET',
             withCredentials: true,
         })
