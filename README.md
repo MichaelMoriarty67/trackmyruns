@@ -38,7 +38,7 @@ Database: PostgreSQL
 | GET         | api/user                   | Gets information about the authenticated user |
 | PATCH       | api/user                   | Updates information about the authenticated user |
 
-# SETUP
+## SETUP
  1. Make sure you have both Python and Node installed
  2. (Optionally) Start a python virtual environment in the top level dir
  3. Install the server dependencies by running `python -r requirements.txt`
