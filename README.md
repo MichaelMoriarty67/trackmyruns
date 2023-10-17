@@ -2,7 +2,15 @@
 ![tmr-wireframe-ui-2](https://github.com/MichaelMoriarty67/trackmyruns/assets/86428098/d6fd7b9d-9060-41c9-975a-344a1cf5d4af)
 *Wireframe of what TMR web app (mobile) will look like... *if I get around to it**
 
-## PROJECT SUMMARY
+### Table of Contents
+1. [Project Summary](#project-summary)
+2. [Milestones](#milestones)
+3. [Backend API Spec](#backend-api-spec)
+4. [Setup](#setup)
+
+You can use these links to navigate directly to each section of your README.
+
+## Project Summary
 🏃‍♀️ **WHAT?** TrackMyRuns is a full stack app for tracking exercise routes that I built to learn more about RESTful API design. The app allow users to stream geolocation time-series data from client to server while moving to build a 'RunMap'. RunMaps get plotted against a map by the client to visualize exercise routes (not done yet).  
 
 Additional features includes:
