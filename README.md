@@ -8,8 +8,6 @@
 3. [Backend API Spec](#backend-api-spec)
 4. [Setup](#setup)
 
-You can use these links to navigate directly to each section of your README.
-
 ## Project Summary
 🏃‍♀️ **WHAT?** TrackMyRuns is a full stack app for tracking exercise routes that I built to learn more about RESTful API design. The app allow users to stream geolocation time-series data from client to server while moving to build a 'RunMap'. RunMaps get plotted against a map by the client to visualize exercise routes (not done yet).  
 
